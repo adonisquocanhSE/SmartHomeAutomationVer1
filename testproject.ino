@@ -1,29 +1,36 @@
 #include "wifiConfig.h"
-
 #define BLYNK_TEMPLATE_ID "TMPL6XHJFf2l7"
 #define BLYNK_TEMPLATE_NAME "Smart Home"
 #define BLYNK_AUTH_TOKEN "3P2IHsisqvrvYuxn-QBX4lcH7w6sYzYG"
 
+#include <WiFi.h>
 #include <BlynkSimpleEsp32.h>
 
 bool blynkConnect = 0;
 
-// ====== RELAY ======
+// ===== RELAY =====
 const int relay1 = 26;
 const int relay2 = 27;
 
-// ====== BUTTON ======
+// ===== BUTTON =====
 const int button1 = 14;
 const int button2 = 12;
 
-// ====== STATE ======
+// ===== HY-SRF05 =====
+const int trigPin = 33;
+const int echoPin = 32;
+
+// ===== STATE =====
 bool state1 = 0;
 bool state2 = 0;
 
-// ====== DEBOUNCE ======
+float previousDistance = 200;
+
 unsigned long lastPress1 = 0;
 unsigned long lastPress2 = 0;
 const int debounceTime = 200;
+
+const int detectDistance = 80; // cm
 
 // ================= BLYNK =================
 BLYNK_CONNECTED() {
@@ -52,10 +59,76 @@ void setup() {
   pinMode(button1, INPUT_PULLUP);
   pinMode(button2, INPUT_PULLUP);
 
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
   digitalWrite(relay1, state1);
   digitalWrite(relay2, state2);
 
   Blynk.config(BLYNK_AUTH_TOKEN, "blynk.cloud", 80);
+}
+
+// ====== ĐO KHOẢNG CÁCH ======
+float getDistance() {
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH, 30000);
+
+  if (duration == 0) return -1;
+
+  float distance = duration * 0.0343 / 2;
+
+  return distance;
+}
+
+// ====== XỬ LÝ SIÊU ÂM (CHỈ BẬT, KHÔNG TẮT) ======
+void checkUltrasonic() {
+
+  static unsigned long lastRead = 0;
+
+  if (millis() - lastRead < 200) return;
+  lastRead = millis();
+
+  float currentDistance = getDistance();
+
+  if (currentDistance > 0) {
+
+    // Chỉ bật khi đang tắt
+    if (currentDistance < detectDistance &&
+        previousDistance >= detectDistance &&
+        state1 == 0) {
+
+      state1 = 1;
+      digitalWrite(relay1, state1);
+      Blynk.virtualWrite(V1, state1);
+
+      Serial.println("Motion detected -> Light ON");
+    }
+
+    previousDistance = currentDistance;
+  }
+
+  static unsigned long lastPrint = 0;
+
+if (millis() - lastPrint > 500) {
+  float d = getDistance();
+
+  if (d > 0) {
+    Serial.print("Distance: ");
+    Serial.print(d);
+    Serial.println(" cm");
+  } else {
+    Serial.println("Out of range");
+  }
+
+  lastPrint = millis();
+}
 }
 
 // ================= LOOP =================
@@ -63,17 +136,12 @@ void loop() {
 
   wifiConfig.run();
 
-  // ===== WIFI OK =====
   if (WiFi.status() == WL_CONNECTED) {
 
-    // ===== KẾT NỐI BLYNK =====
     if (blynkConnect == 0) {
-      Serial.println("Connecting to Blynk...");
       if (Blynk.connect(3000)) {
-        Serial.println("Blynk Connected!");
         blynkConnect = 1;
-      } else {
-        Serial.println("Blynk Failed!");
+        Serial.println("Blynk Connected");
       }
     }
 
@@ -83,22 +151,21 @@ void loop() {
   }
 
   // ===== BUTTON 1 =====
-  if (digitalRead(button1) == LOW) {
-    if (millis() - lastPress1 > debounceTime) {
-      state1 = !state1;
-      digitalWrite(relay1, state1);
-      Blynk.virtualWrite(V1, state1);
-      lastPress1 = millis();
-    }
+  if (digitalRead(button1) == LOW && millis() - lastPress1 > debounceTime) {
+    state1 = !state1;
+    digitalWrite(relay1, state1);
+    Blynk.virtualWrite(V1, state1);
+    lastPress1 = millis();
   }
 
   // ===== BUTTON 2 =====
-  if (digitalRead(button2) == LOW) {
-    if (millis() - lastPress2 > debounceTime) {
-      state2 = !state2;
-      digitalWrite(relay2, state2);
-      Blynk.virtualWrite(V2, state2);
-      lastPress2 = millis();
-    }
+  if (digitalRead(button2) == LOW && millis() - lastPress2 > debounceTime) {
+    state2 = !state2;
+    digitalWrite(relay2, state2);
+    Blynk.virtualWrite(V2, state2);
+    lastPress2 = millis();
   }
+
+  // ===== ULTRASONIC =====
+  checkUltrasonic();
 }
