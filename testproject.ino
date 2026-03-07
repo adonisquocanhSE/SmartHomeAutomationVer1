@@ -1,12 +1,13 @@
 #include "wifiConfig.h"
-#define BLYNK_TEMPLATE_ID "TMPL6XHJFf2l7"
-#define BLYNK_TEMPLATE_NAME "Smart Home"
-#define BLYNK_AUTH_TOKEN "3P2IHsisqvrvYuxn-QBX4lcH7w6sYzYG"
+#define BLYNK_TEMPLATE_ID "TMPL6dzICp2yC"
+#define BLYNK_TEMPLATE_NAME "SmartHome"
+#define BLYNK_AUTH_TOKEN "SoQcwvvvE09Ln8-JyPePQ2gQyJ3bydna"
 
 #include <WiFi.h>
 #include <BlynkSimpleEsp32.h>
 
 bool blynkConnect = 0;
+bool autoMode = 0;
 
 // ===== RELAY =====
 const int relay1 = 26;
@@ -34,7 +35,7 @@ const int detectDistance = 80; // cm
 
 // ================= BLYNK =================
 BLYNK_CONNECTED() {
-  Blynk.syncVirtual(V1, V2);
+  Blynk.syncVirtual(V1, V2, V10);
 }
 
 BLYNK_WRITE(V1) {
@@ -45,6 +46,16 @@ BLYNK_WRITE(V1) {
 BLYNK_WRITE(V2) {
   state2 = param.asInt();
   digitalWrite(relay2, state2);
+}
+
+BLYNK_WRITE(V10) {
+  autoMode = param.asInt();
+
+  if(autoMode){
+    Serial.println("AUTO MODE ON");
+  }else{
+    Serial.println("AUTO MODE OFF");
+  }
 }
 
 // ================= SETUP =================
@@ -167,5 +178,7 @@ void loop() {
   }
 
   // ===== ULTRASONIC =====
-  checkUltrasonic();
+  if(autoMode){
+    checkUltrasonic();
+  }
 }
