@@ -21,6 +21,8 @@ const int button2 = 12;
 const int trigPin = 33;
 const int echoPin = 32;
 
+#define LM35_PIN 34
+
 // ===== STATE =====
 bool state1 = 0;
 bool state2 = 0;
@@ -32,6 +34,9 @@ unsigned long lastPress2 = 0;
 const int debounceTime = 200;
 
 const int detectDistance = 80; // cm
+
+unsigned long lastTempRead = 0;
+const int tempInterval = 2000; // đọc mỗi 2 giây
 
 // ================= BLYNK =================
 BLYNK_CONNECTED() {
@@ -96,6 +101,32 @@ float getDistance() {
   float distance = duration * 0.0343 / 2;
 
   return distance;
+}
+
+float readTemperature() {
+
+  int adcValue = analogRead(LM35_PIN);
+
+  float voltage = adcValue * (3.3 / 4095.0);
+
+  float temperature = voltage * 100;
+
+  return temperature;
+}
+
+void sendTemperature() {
+
+  if (millis() - lastTempRead < tempInterval) return;
+
+  lastTempRead = millis();
+
+  float temp = readTemperature();
+
+  Blynk.virtualWrite(V6, temp);
+
+  Serial.print("Temperature: ");
+  Serial.print(temp);
+  Serial.println(" C");
 }
 
 // ====== XỬ LÝ SIÊU ÂM (CHỈ BẬT, KHÔNG TẮT) ======
@@ -176,6 +207,9 @@ void loop() {
     Blynk.virtualWrite(V2, state2);
     lastPress2 = millis();
   }
+
+  // ===== TEMPERATURE =====
+  sendTemperature();
 
   // ===== ULTRASONIC =====
   if(autoMode){
