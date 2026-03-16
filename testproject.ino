@@ -5,88 +5,80 @@
 
 #include <WiFi.h>
 #include <BlynkSimpleEsp32.h>
+#include <LiquidCrystal_I2C.h>
+#include <ESP32Servo.h>
+#include <Wire.h>
 
-bool blynkConnect = 0;
+LiquidCrystal_I2C lcd(0x27,16,2);
+Servo doorServo;
+
+// ===== MODE =====
 bool autoMode = 0;
 
-// ===== RELAY =====
-const int relay1 = 26;
-const int relay2 = 27;
+// ===== LED =====
+const int led1 = 26;
+const int led2 = 27;
 
 // ===== BUTTON =====
 const int button1 = 14;
 const int button2 = 12;
 
-// ===== HY-SRF05 =====
+// ===== ULTRASONIC =====
 const int trigPin = 33;
 const int echoPin = 32;
 
-#define LM35_PIN 34
+// ===== LM35 =====
+const int LM35_PIN = 34;
+
+// ===== SERVO =====
+const int servoPin = 15;
 
 // ===== STATE =====
-bool state1 = 0;
-bool state2 = 0;
+bool ledState = 0;
+bool servoState = 0;
 
-float previousDistance = 200;
+unsigned long lastTempRead = 0;
+unsigned long lastDistanceRead = 0;
 
 unsigned long lastPress1 = 0;
 unsigned long lastPress2 = 0;
+
 const int debounceTime = 200;
 
-const int detectDistance = 80; // cm
-
-unsigned long lastTempRead = 0;
-const int tempInterval = 2000; // đọc mỗi 2 giây
+int detectDistance = 80;
 
 // ================= BLYNK =================
-BLYNK_CONNECTED() {
-  Blynk.syncVirtual(V1, V2, V10);
+
+BLYNK_CONNECTED()
+{
+  Blynk.syncVirtual(V1,V2,V10);
 }
 
-BLYNK_WRITE(V1) {
-  state1 = param.asInt();
-  digitalWrite(relay1, state1);
+BLYNK_WRITE(V1)
+{
+  ledState = param.asInt();
+  digitalWrite(led1, ledState);
 }
 
-BLYNK_WRITE(V2) {
-  state2 = param.asInt();
-  digitalWrite(relay2, state2);
+BLYNK_WRITE(V2)
+{
+  servoState = param.asInt();
+
+  if(servoState)
+    doorServo.write(90);
+  else
+    doorServo.write(0);
 }
 
-BLYNK_WRITE(V10) {
+BLYNK_WRITE(V10)
+{
   autoMode = param.asInt();
-
-  if(autoMode){
-    Serial.println("AUTO MODE ON");
-  }else{
-    Serial.println("AUTO MODE OFF");
-  }
 }
 
-// ================= SETUP =================
-void setup() {
-  Serial.begin(115200);
+// ================= ULTRASONIC =================
 
-  wifiConfig.begin();
-
-  pinMode(relay1, OUTPUT);
-  pinMode(relay2, OUTPUT);
-
-  pinMode(button1, INPUT_PULLUP);
-  pinMode(button2, INPUT_PULLUP);
-
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-
-  digitalWrite(relay1, state1);
-  digitalWrite(relay2, state2);
-
-  Blynk.config(BLYNK_AUTH_TOKEN, "blynk.cloud", 80);
-}
-
-// ====== ĐO KHOẢNG CÁCH ======
-float getDistance() {
-
+float getDistance()
+{
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
 
@@ -94,125 +86,145 @@ float getDistance() {
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
 
-  long duration = pulseIn(echoPin, HIGH, 30000);
+  long duration = pulseIn(echoPin, HIGH,30000);
 
-  if (duration == 0) return -1;
+  if(duration==0) return -1;
 
   float distance = duration * 0.0343 / 2;
 
   return distance;
 }
 
-float readTemperature() {
+// ================= TEMPERATURE =================
 
-  int adcValue = analogRead(LM35_PIN);
+float readTemperature()
+{
+  int adc = analogRead(LM35_PIN);
 
-  float voltage = adcValue * (3.3 / 4095.0);
+  float voltage = adc * 3.3 / 4095.0;
 
-  float temperature = voltage * 100;
+  float temp = voltage * 100;
 
-  return temperature;
+  return temp;
 }
 
-void sendTemperature() {
-
-  if (millis() - lastTempRead < tempInterval) return;
+void sendTemperature()
+{
+  if(millis() - lastTempRead < 2000) return;
 
   lastTempRead = millis();
 
   float temp = readTemperature();
 
-  Blynk.virtualWrite(V6, temp);
+  Blynk.virtualWrite(V6,temp);
 
-  Serial.print("Temperature: ");
-  Serial.print(temp);
-  Serial.println(" C");
+  lcd.setCursor(0,0);
+  lcd.print("Temp:");
+  lcd.print(temp);
+  lcd.print("C   ");
 }
 
-// ====== XỬ LÝ SIÊU ÂM (CHỈ BẬT, KHÔNG TẮT) ======
-void checkUltrasonic() {
+// ================= AUTO MODE =================
 
-  static unsigned long lastRead = 0;
+void checkUltrasonic()
+{
+  if(millis() - lastDistanceRead < 300) return;
 
-  if (millis() - lastRead < 200) return;
-  lastRead = millis();
+  lastDistanceRead = millis();
 
-  float currentDistance = getDistance();
-
-  if (currentDistance > 0) {
-
-    // Chỉ bật khi đang tắt
-    if (currentDistance < detectDistance &&
-        previousDistance >= detectDistance &&
-        state1 == 0) {
-
-      state1 = 1;
-      digitalWrite(relay1, state1);
-      Blynk.virtualWrite(V1, state1);
-
-      Serial.println("Motion detected -> Light ON");
-    }
-
-    previousDistance = currentDistance;
-  }
-
-  static unsigned long lastPrint = 0;
-
-if (millis() - lastPrint > 500) {
   float d = getDistance();
 
-  if (d > 0) {
-    Serial.print("Distance: ");
-    Serial.print(d);
-    Serial.println(" cm");
-  } else {
-    Serial.println("Out of range");
-  }
+  if(d > 0 && d < detectDistance)
+  {
+    lcd.setCursor(0,1);
+    lcd.print("Someone at door");
 
-  lastPrint = millis();
+    digitalWrite(led2,HIGH);
+    delay(200);
+    digitalWrite(led2,LOW);
+  }
+  else
+  {
+    lcd.setCursor(0,1);
+    lcd.print("Door clear      ");
+  }
 }
+
+// ================= SETUP =================
+
+void setup()
+{
+  Serial.begin(9600);
+
+  wifiConfig.begin();
+
+  pinMode(led1,OUTPUT);
+  pinMode(led2,OUTPUT);
+
+  pinMode(button1,INPUT_PULLUP);
+  pinMode(button2,INPUT_PULLUP);
+
+  pinMode(trigPin,OUTPUT);
+  pinMode(echoPin,INPUT);
+
+  // LCD I2C chân mới
+  Wire.begin(2,4);
+
+  lcd.init();
+  lcd.backlight();
+
+  doorServo.attach(servoPin);
+
+  Blynk.config(BLYNK_AUTH_TOKEN,"blynk.cloud",80);
+
+  lcd.setCursor(0,0);
+  lcd.print("Smart Home");
 }
 
 // ================= LOOP =================
-void loop() {
 
+void loop()
+{
   wifiConfig.run();
 
-  if (WiFi.status() == WL_CONNECTED) {
-
-    if (blynkConnect == 0) {
-      if (Blynk.connect(3000)) {
-        blynkConnect = 1;
-        Serial.println("Blynk Connected");
-      }
-    }
-
-    if (!Blynk.connected()) blynkConnect = 0;
-
+  if(WiFi.status()==WL_CONNECTED)
+  {
     Blynk.run();
   }
 
-  // ===== BUTTON 1 =====
-  if (digitalRead(button1) == LOW && millis() - lastPress1 > debounceTime) {
-    state1 = !state1;
-    digitalWrite(relay1, state1);
-    Blynk.virtualWrite(V1, state1);
+  // ===== BUTTON LED =====
+  if(digitalRead(button1)==LOW && millis()-lastPress1>debounceTime)
+  {
+    ledState = !ledState;
+
+    digitalWrite(led1,ledState);
+
+    Blynk.virtualWrite(V1,ledState);
+
     lastPress1 = millis();
   }
 
-  // ===== BUTTON 2 =====
-  if (digitalRead(button2) == LOW && millis() - lastPress2 > debounceTime) {
-    state2 = !state2;
-    digitalWrite(relay2, state2);
-    Blynk.virtualWrite(V2, state2);
+  // ===== BUTTON SERVO =====
+  if(digitalRead(button2)==LOW && millis()-lastPress2>debounceTime)
+  {
+    servoState = !servoState;
+
+    if(servoState)
+      doorServo.write(90);
+    else
+      doorServo.write(0);
+
+    Blynk.virtualWrite(V2,servoState);
+
     lastPress2 = millis();
   }
 
   // ===== TEMPERATURE =====
   sendTemperature();
 
-  // ===== ULTRASONIC =====
-  if(autoMode){
+  // ===== AUTO MODE =====
+  if(autoMode)
+  {
     checkUltrasonic();
   }
 }
