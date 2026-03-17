@@ -31,7 +31,7 @@ const int echoPin = 32;
 const int LM35_PIN = 34;
 
 // ===== SERVO =====
-const int servoPin = 15;
+const int servoPin = 25;
 
 // ===== STATE =====
 bool ledState = 0;
@@ -45,7 +45,7 @@ unsigned long lastPress2 = 0;
 
 const int debounceTime = 200;
 
-int detectDistance = 80;
+int detectDistance = 10;
 
 // ================= BLYNK =================
 
@@ -102,6 +102,9 @@ float readTemperature()
   int adc = analogRead(LM35_PIN);
 
   float voltage = adc * 3.3 / 4095.0;
+  // adc: 0 - 4095: 12 bit khác với 10 bit của arduino uno
+  // vol: 0V - 3.3V
+  // temp: 0 - 100 độ
 
   float temp = voltage * 100;
 
@@ -110,7 +113,7 @@ float readTemperature()
 
 void sendTemperature()
 {
-  if(millis() - lastTempRead < 2000) return;
+  if(millis() - lastTempRead < 2000) return; // = delay(2000)
 
   lastTempRead = millis();
 
@@ -128,7 +131,7 @@ void sendTemperature()
 
 void checkUltrasonic()
 {
-  if(millis() - lastDistanceRead < 300) return;
+  if(millis() - lastDistanceRead < 300) return; // = delay(300)
 
   lastDistanceRead = millis();
 
