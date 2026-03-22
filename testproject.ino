@@ -213,9 +213,9 @@ void loop()
     servoState = !servoState;
 
     if(servoState)
-      doorServo.write(90);
-    else
       doorServo.write(0);
+    else
+      doorServo.write(90);
 
     Blynk.virtualWrite(V2,servoState);
 
