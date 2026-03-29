@@ -75,26 +75,6 @@ BLYNK_WRITE(V10)
   autoMode = param.asInt();
 }
 
-// ================= ULTRASONIC =================
-
-float getDistance()
-{
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-
-  long duration = pulseIn(echoPin, HIGH,30000);
-
-  if(duration==0) return -1;
-
-  float distance = duration * 0.0343 / 2;
-
-  return distance;
-}
-
 // ================= TEMPERATURE =================
 
 float readTemperature()
@@ -102,9 +82,6 @@ float readTemperature()
   int adc = analogRead(LM35_PIN);
 
   float voltage = adc * 3.3 / 4095.0;
-  // adc: 0 - 4095: 12 bit khác với 10 bit của arduino uno
-  // vol: 0V - 3.3V
-  // temp: 0 - 100 độ
 
   float temp = voltage * 100;
 
@@ -127,11 +104,31 @@ void sendTemperature()
   lcd.print("C   ");
 }
 
+// ================= ULTRASONIC =================
+
+float getDistance()
+{
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH, 30000);
+
+  if(duration==0) return -1;
+
+  float distance = duration * 0.0343 / 2;
+
+  return distance;
+}
+
 // ================= AUTO MODE =================
 
 void checkUltrasonic()
 {
-  if(millis() - lastDistanceRead < 300) return; // = delay(300)
+  if(millis() - lastDistanceRead < 300) return;
 
   lastDistanceRead = millis();
 
