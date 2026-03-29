@@ -65,9 +65,9 @@ BLYNK_WRITE(V2)
   servoState = param.asInt();
 
   if(servoState)
-    doorServo.write(90);
-  else
     doorServo.write(0);
+  else
+    doorServo.write(90);
 }
 
 BLYNK_WRITE(V10)
