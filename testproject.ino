@@ -12,28 +12,18 @@
 LiquidCrystal_I2C lcd(0x27,16,2);
 Servo doorServo;
 
-// ===== MODE =====
-bool autoMode = 0;
-
-// ===== LED =====
+//Pin
 const int led1 = 26;
 const int led2 = 27;
-
-// ===== BUTTON =====
 const int button1 = 14;
 const int button2 = 12;
-
-// ===== ULTRASONIC =====
 const int trigPin = 33;
 const int echoPin = 32;
-
-// ===== LM35 =====
 const int LM35_PIN = 34;
-
-// ===== SERVO =====
 const int servoPin = 25;
 
-// ===== STATE =====
+//State
+bool autoMode = 0;
 bool ledState = 0;
 bool servoState = 0;
 
@@ -47,8 +37,7 @@ const int debounceTime = 200;
 
 int detectDistance = 10;
 
-// ================= BLYNK =================
-
+//Nhan tu Blynk
 BLYNK_CONNECTED()
 {
   Blynk.syncVirtual(V1,V2,V10);
@@ -75,8 +64,7 @@ BLYNK_WRITE(V10)
   autoMode = param.asInt();
 }
 
-// ================= TEMPERATURE =================
-
+//LM35
 float readTemperature()
 {
   int adc = analogRead(LM35_PIN);
@@ -90,7 +78,7 @@ float readTemperature()
 
 void sendTemperature()
 {
-  if(millis() - lastTempRead < 2000) return; // = delay(2000)
+  if(millis() - lastTempRead < 2000) return;
 
   lastTempRead = millis();
 
@@ -104,8 +92,7 @@ void sendTemperature()
   lcd.print("C   ");
 }
 
-// ================= ULTRASONIC =================
-
+//Ultrasonic
 float getDistance()
 {
   digitalWrite(trigPin, LOW);
@@ -123,8 +110,6 @@ float getDistance()
 
   return distance;
 }
-
-// ================= AUTO MODE =================
 
 void checkUltrasonic()
 {
@@ -150,8 +135,7 @@ void checkUltrasonic()
   }
 }
 
-// ================= SETUP =================
-
+//Setup
 void setup()
 {
   Serial.begin(9600);
@@ -167,7 +151,6 @@ void setup()
   pinMode(trigPin,OUTPUT);
   pinMode(echoPin,INPUT);
 
-  // LCD I2C chân mới
   Wire.begin(2,4);
 
   lcd.init();
@@ -181,8 +164,7 @@ void setup()
   lcd.print("Smart Home");
 }
 
-// ================= LOOP =================
-
+//loop
 void loop()
 {
   wifiConfig.run();
@@ -192,7 +174,7 @@ void loop()
     Blynk.run();
   }
 
-  // ===== BUTTON LED =====
+  //button led
   if(digitalRead(button1)==LOW && millis()-lastPress1>debounceTime)
   {
     ledState = !ledState;
@@ -204,7 +186,7 @@ void loop()
     lastPress1 = millis();
   }
 
-  // ===== BUTTON SERVO =====
+  //button servo
   if(digitalRead(button2)==LOW && millis()-lastPress2>debounceTime)
   {
     servoState = !servoState;
@@ -219,10 +201,10 @@ void loop()
     lastPress2 = millis();
   }
 
-  // ===== TEMPERATURE =====
+  //lm35
   sendTemperature();
 
-  // ===== AUTO MODE =====
+  //auto
   if(autoMode)
   {
     checkUltrasonic();
