@@ -205,8 +205,10 @@ void loop()
   sendTemperature();
 
   //auto
-  if(autoMode)
-  {
+  if(autoMode) {
     checkUltrasonic();
+  } else {
+    lcd.setCursor(0,1);
+    lcd.print("                ");
   }
 }
